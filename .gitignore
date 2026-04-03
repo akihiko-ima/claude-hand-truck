@@ -44,3 +44,10 @@ coverage/
 # yarn.lock
 
 .claude/settings.local.json
+
+# python
+*.pyc
+__pycache__/
+
+# MediaPipe models (large binary files)
+models/*.task

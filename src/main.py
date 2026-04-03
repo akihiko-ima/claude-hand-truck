@@ -3,9 +3,21 @@
 全コンポーネントを初期化し、メインループを制御する。
 """
 
+import sys
+import os
+# python src/main.py で直接実行された場合にプロジェクトルートをパスに追加
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+
 import logging
 import time
 from datetime import datetime
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 from src.detection.calibration_manager import CalibrationManager
 from src.detection.hand_detector import HandDetector
@@ -21,6 +33,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+console = Console()
+
 # アプリケーション設定
 CAMERA_IDS = [0]       # 使用するカメラID (デュアルカメラの場合は [0, 1])
 TABLE_ID = "table_01"  # テーブル識別子
@@ -28,7 +42,11 @@ TABLE_ID = "table_01"  # テーブル識別子
 
 def main() -> None:
     """CleanTrack メインエントリーポイント。"""
-    print("CleanTrack を起動しています...")
+    console.print(Panel(
+        Text("CleanTrack 清掃モニタリング", justify="center"),
+        style="bold cyan",
+        padding=(1, 4),
+    ))
 
     # --- コンポーネント初期化 ---
     calib_manager = CalibrationManager()
@@ -45,22 +63,23 @@ def main() -> None:
     for cam_id in CAMERA_IDS:
         config = calib_manager.load_config(cam_id)
         if config is None:
-            print(f"カメラ{cam_id}のキャリブレーション設定が見つかりません。キャリブレーションを開始します。")
+            console.print(f"[yellow]カメラ {cam_id} のキャリブレーション設定が見つかりません。キャリブレーションを開始します。[/]")
             frames = camera_manager.get_frames()
             if cam_id not in frames:
-                print(f"カメラ{cam_id}が接続されていません。終了します。")
+                console.print(f"[bold red]カメラ {cam_id} が接続されていません。終了します。[/]")
                 camera_manager.release()
                 display.destroy()
                 return
             config = calib_manager.run_calibration(cam_id, frames[cam_id])
         calibrations[cam_id] = config
-        print(f"カメラ{cam_id}のキャリブレーション設定を読み込みました。")
+        console.print(f"[green]✓ カメラ {cam_id} のキャリブレーション設定を読み込みました。[/]")
 
     # MediaPipe 手検出エンジンの初期化
     try:
-        detector = HandDetector(calib_manager)
+        with console.status("[cyan]手検出エンジンを初期化しています...[/]", spinner="dots"):
+            detector = HandDetector(calib_manager)
     except RuntimeError as e:
-        print(str(e))
+        console.print(f"[bold red]{e}[/]")
         camera_manager.release()
         display.destroy()
         return
@@ -68,8 +87,11 @@ def main() -> None:
     # 清掃セッションの開始
     session = storage.create_session(TABLE_ID)
     tracker.reset()
-    print(f"清掃セッションを開始しました。(ID: {session.session_id})")
-    print("qキーで終了します。")
+    console.print(Panel(
+        f"[green]セッション ID: {session.session_id}[/]\n[dim]q キーで終了します[/]",
+        title="[bold green]清掃セッション開始[/]",
+        border_style="green",
+    ))
 
     prev_time = time.time()
 
@@ -115,23 +137,29 @@ def main() -> None:
             # キー入力の処理
             key = display.wait_key(delay_ms=1)
             if key == "q":
-                print("終了キーが押されました。")
+                console.print("[dim]終了キーが押されました。[/]")
                 break
 
     except KeyboardInterrupt:
-        print("\nCtrl+C が押されました。終了します。")
+        console.print("\n[yellow]Ctrl+C が押されました。終了します。[/]")
     finally:
         # --- 終了処理 ---
         session.ended_at = datetime.now().isoformat()
         session.cleaning_rate = tracker.get_cleaning_rate()
         heatmap = renderer.render(tracker.get_grid())
         storage.save_session(session, heatmap)
-        print(f"清掃セッションを保存しました。(完了率: {session.cleaning_rate * 100:.1f}%)")
+
+        console.print(Panel(
+            f"[green]完了率: {session.cleaning_rate * 100:.1f}%[/]\n"
+            f"[dim]保存先: data/sessions/{session.session_id}/[/]",
+            title="[bold green]セッション保存完了[/]",
+            border_style="green",
+        ))
 
         detector.close()
         camera_manager.release()
         display.destroy()
-        print("CleanTrack を終了しました。")
+        console.print("[dim]CleanTrack を終了しました。[/]")
 
 
 if __name__ == "__main__":
