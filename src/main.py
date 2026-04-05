@@ -15,6 +15,9 @@ import logging
 import time
 from datetime import datetime
 
+import cv2
+import numpy as np
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -36,7 +39,7 @@ logger = logging.getLogger(__name__)
 console = Console()
 
 # アプリケーション設定
-CAMERA_IDS = [0]       # 使用するカメラID (デュアルカメラの場合は [0, 1])
+CAMERA_IDS = [0, 1]    # 使用するカメラID
 TABLE_ID = "table_01"  # テーブル識別子
 
 
@@ -118,7 +121,19 @@ def main() -> None:
                     continue
                 positions = detector.detect(frame, cam_id, calib)
                 all_positions.extend(positions)
-                annotated_frames[cam_id] = detector.draw_landmarks(frame, positions)
+                annotated = detector.draw_landmarks(frame, positions)
+
+                # キャリブレーションエリアを半透明ポリゴンで描画
+                pts = np.array(calib.table_corners, dtype=np.int32)
+                overlay = annotated.copy()
+                cv2.fillPoly(overlay, [pts], (0, 200, 255))
+                annotated = cv2.addWeighted(overlay, 0.12, annotated, 0.88, 0)
+                cv2.polylines(annotated, [pts], True, (0, 200, 255), 2)
+                cv2.putText(
+                    annotated, f"Cam{cam_id} table area", (pts[0][0], pts[0][1] - 8),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1,
+                )
+                annotated_frames[cam_id] = annotated
 
             # グリッドトラッカーの更新
             tracker.update(all_positions, delta_time)

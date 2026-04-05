@@ -49,5 +49,6 @@ coverage/
 *.pyc
 __pycache__/
 
-# MediaPipe models (large binary files)
-models/*.task
+# config
+config/*
+!config/.gitkeep

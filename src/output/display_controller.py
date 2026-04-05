@@ -88,7 +88,7 @@ class DisplayController:
         """清掃完了率を表示するステータスバーを生成する。"""
         bar = np.zeros((50, width, 3), dtype=np.uint8)
         cleaned_cells = round(cleaning_rate * 24)
-        text = f"清掃完了率: {cleaned_cells}/24 ({cleaning_rate * 100:.1f}%)   [q: 終了]"
+        text = f"Cleaning: {cleaned_cells}/24 ({cleaning_rate * 100:.1f}%)  [q: quit]"
         cv2.putText(
             bar, text, (10, 35),
             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2,
@@ -105,7 +105,7 @@ class DisplayController:
         result = cv2.addWeighted(overlay, 0.4, img, 0.6, 0)
 
         # 「清掃完了！」テキスト
-        text = "清掃完了！"
+        text = "ALL CLEAN!"
         font_scale = 3.0
         thickness = 4
         text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]

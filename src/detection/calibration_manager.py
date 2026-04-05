@@ -67,7 +67,7 @@ class CalibrationManager:
                 cv2.polylines(show_frame, [pts], False, (0, 255, 0), 2)
 
             remaining = 4 - len(self._clicked_points)
-            msg = f"残り{remaining}点クリックしてください" if remaining > 0 else "4点選択完了"
+            msg = f"Click {remaining} more point(s)" if remaining > 0 else "Done! (4/4)"
             cv2.putText(
                 show_frame, msg, (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2,

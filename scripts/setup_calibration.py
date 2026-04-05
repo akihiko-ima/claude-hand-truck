@@ -59,7 +59,7 @@ def _calibrate_camera(cam_id: int, frame: np.ndarray) -> list[tuple[int, int]] |
         4頂点のリスト (左上→右上→右下→左下)。キャンセル時は None。
     """
     clicked: list[tuple[int, int]] = []
-    window_name = f"キャリブレーション - カメラ {cam_id}"
+    window_name = f"Calibration - Camera {cam_id}"
     display_frame = frame.copy()
 
     def mouse_callback(event: int, x: int, y: int, flags: int, param: object) -> None:
@@ -83,7 +83,7 @@ def _calibrate_camera(cam_id: int, frame: np.ndarray) -> list[tuple[int, int]] |
         border_style="cyan",
     ))
 
-    labels = ["左上(1)", "右上(2)", "右下(3)", "左下(4)"]
+    labels = ["TL(1)", "TR(2)", "BR(3)", "BL(4)"]
 
     while True:
         show = display_frame.copy()
@@ -100,9 +100,9 @@ def _calibrate_camera(cam_id: int, frame: np.ndarray) -> list[tuple[int, int]] |
             cv2.polylines(show, [pts], len(clicked) == 4, (0, 255, 0), 2)
 
         if len(clicked) < 4:
-            msg = f"次: {labels[len(clicked)]} をクリック  ({len(clicked)}/4)"
+            msg = f"Next: {labels[len(clicked)]}  ({len(clicked)}/4)"
         else:
-            msg = "4点選択完了!"
+            msg = "Done! (4/4)"
         cv2.putText(show, msg, (10, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
         cv2.imshow(window_name, show)
@@ -157,17 +157,17 @@ def _show_blend_preview(
 
     sep = np.full((8, PREVIEW_WIDTH, 3), 60, dtype=np.uint8)
     panel = np.vstack([
-        _labeled(warped0, f"Camera {CAMERA_IDS[0]} 俯瞰"),
+        _labeled(warped0, f"Camera {CAMERA_IDS[0]}"),
         sep,
-        _labeled(warped1, f"Camera {CAMERA_IDS[1]} 俯瞰"),
+        _labeled(warped1, f"Camera {CAMERA_IDS[1]}"),
         sep,
-        _labeled(blended, "ブレンド (両カメラが一致していれば補正成功)"),
+        _labeled(blended, "Blend"),
     ])
 
     guide_h = 45
     guide_bar = np.zeros((guide_h, PREVIEW_WIDTH, 3), dtype=np.uint8)
     cv2.putText(
-        guide_bar, "s: 保存して完了  /  r: 最初からやり直す  /  q: 終了",
+        guide_bar, "s: save & done  /  r: retry  /  q: quit",
         (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (200, 200, 200), 1,
     )
     panel = np.vstack([panel, guide_bar])
@@ -188,7 +188,7 @@ def _show_blend_preview(
         border_style="cyan",
     ))
 
-    window_name = "相互補正プレビュー"
+    window_name = "Blend Preview"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(window_name, PREVIEW_WIDTH, panel.shape[0])
     cv2.imshow(window_name, panel)
