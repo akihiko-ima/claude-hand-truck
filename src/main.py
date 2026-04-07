@@ -23,6 +23,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+from src.app_config import load_config
 from src.detection.calibration_manager import CalibrationManager
 from src.detection.hand_detector import HandDetector
 from src.input.camera_manager import CameraManager
@@ -61,9 +62,14 @@ def main() -> None:
         debug_saver = DebugImageSaver(OUTPUTS_DIR)
 
     # --- コンポーネント初期化 ---
+    config = load_config()
     calib_manager = CalibrationManager()
     storage = DataStorage()
-    tracker = GridTracker()
+    tracker = GridTracker(
+        rows=config.grid.rows,
+        cols=config.grid.cols,
+        clean_threshold_seconds=config.grid.clean_threshold_seconds,
+    )
     renderer = HeatmapRenderer()
 
     # カメラ初期化

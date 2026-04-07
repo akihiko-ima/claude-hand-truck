@@ -5,17 +5,21 @@ from src.models.hand_position import HandPosition
 
 
 class GridTracker:
-    """テーブルの24グリッドセルの清掃状態を管理するクラス。
+    """テーブルのグリッドセルの清掃状態を管理するクラス。
 
-    各セルの累積清掃時間を追跡し、CLEAN_THRESHOLD_SECONDS 以上で清掃完了と判定する。
+    各セルの累積清掃時間を追跡し、clean_threshold_seconds 以上で清掃完了と判定する。
     マルチカメラの検出結果は呼び出し元でリストをマージして渡すこと（論理和統合）。
     """
 
-    ROWS = 2
-    COLS = 12
-    CLEAN_THRESHOLD_SECONDS = 5.0
-
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        rows: int = 2,
+        cols: int = 12,
+        clean_threshold_seconds: float = 5.0,
+    ) -> None:
+        self.ROWS = rows
+        self.COLS = cols
+        self.CLEAN_THRESHOLD_SECONDS = clean_threshold_seconds
         self._grid = self._create_grid()
 
     def _create_grid(self) -> list[list[GridCell]]:

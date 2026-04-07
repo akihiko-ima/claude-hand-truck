@@ -26,6 +26,12 @@ class TestGridTrackerInit:
         assert len(grid) == 2
         assert all(len(row) == 12 for row in grid)
 
+    def test_grid_size_is_configurable(self) -> None:
+        tracker = GridTracker(rows=3, cols=6)
+        grid = tracker.get_grid()
+        assert len(grid) == 3
+        assert all(len(row) == 6 for row in grid)
+
     def test_all_cells_are_not_cleaned_on_init(self) -> None:
         tracker = GridTracker()
         for row in tracker.get_grid():

@@ -1,0 +1,4 @@
+[grid]
+rows = 3
+cols = 8
+clean_threshold_seconds = 3.0
