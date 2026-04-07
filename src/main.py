@@ -14,6 +14,7 @@ sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
 import logging
 import time
 from datetime import datetime
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -25,7 +26,7 @@ from rich.text import Text
 from src.detection.calibration_manager import CalibrationManager
 from src.detection.hand_detector import HandDetector
 from src.input.camera_manager import CameraManager
-from src.output.display_controller import DisplayController
+from src.output.display_controller import DebugImageSaver
 from src.output.heatmap_renderer import HeatmapRenderer
 from src.storage.data_storage import DataStorage
 from src.tracking.grid_tracker import GridTracker
@@ -41,22 +42,29 @@ console = Console()
 # アプリケーション設定
 CAMERA_IDS = [0, 1]    # 使用するカメラID
 TABLE_ID = "table_01"  # テーブル識別子
+OUTPUTS_DIR = Path("outputs")
 
 
 def main() -> None:
     """CleanTrack メインエントリーポイント。"""
+    debug_mode = "debug" in sys.argv
+
     console.print(Panel(
         Text("CleanTrack 清掃モニタリング", justify="center"),
         style="bold cyan",
         padding=(1, 4),
     ))
 
+    if debug_mode:
+        OUTPUTS_DIR.mkdir(exist_ok=True)
+        console.print(f"[yellow]デバッグモード: 画像を {OUTPUTS_DIR}/debug.jpg に1秒ごとに保存します[/]")
+        debug_saver = DebugImageSaver(OUTPUTS_DIR)
+
     # --- コンポーネント初期化 ---
     calib_manager = CalibrationManager()
     storage = DataStorage()
     tracker = GridTracker()
     renderer = HeatmapRenderer()
-    display = DisplayController()
 
     # カメラ初期化
     camera_manager = CameraManager(CAMERA_IDS)
@@ -71,7 +79,6 @@ def main() -> None:
             if cam_id not in frames:
                 console.print(f"[bold red]カメラ {cam_id} が接続されていません。終了します。[/]")
                 camera_manager.release()
-                display.destroy()
                 return
             config = calib_manager.run_calibration(cam_id, frames[cam_id])
         calibrations[cam_id] = config
@@ -84,19 +91,19 @@ def main() -> None:
     except RuntimeError as e:
         console.print(f"[bold red]{e}[/]")
         camera_manager.release()
-        display.destroy()
         return
 
     # 清掃セッションの開始
     session = storage.create_session(TABLE_ID)
     tracker.reset()
     console.print(Panel(
-        f"[green]セッション ID: {session.session_id}[/]\n[dim]q キーで終了します[/]",
+        f"[green]セッション ID: {session.session_id}[/]\n[dim]Ctrl+C で終了します[/]",
         title="[bold green]清掃セッション開始[/]",
         border_style="green",
     ))
 
     prev_time = time.time()
+    last_save_time = 0.0
 
     # --- メインループ ---
     try:
@@ -146,14 +153,10 @@ def main() -> None:
             heatmap = renderer.render(grid)
             storage.save_session(session, heatmap)
 
-            # 統合画面の表示
-            display.show(annotated_frames, heatmap, cleaning_rate)
-
-            # キー入力の処理
-            key = display.wait_key(delay_ms=1)
-            if key == "q":
-                console.print("[dim]終了キーが押されました。[/]")
-                break
+            # デバッグモード: 1秒ごとに画像を保存
+            if debug_mode and (current_time - last_save_time >= 1.0):
+                debug_saver.save(annotated_frames, heatmap, cleaning_rate)
+                last_save_time = current_time
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Ctrl+C が押されました。終了します。[/]")
@@ -173,7 +176,6 @@ def main() -> None:
 
         detector.close()
         camera_manager.release()
-        display.destroy()
         console.print("[dim]CleanTrack を終了しました。[/]")
 
 

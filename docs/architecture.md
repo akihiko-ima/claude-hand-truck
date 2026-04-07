@@ -47,8 +47,8 @@
 │  グリッド管理・累積時間計算・清掃完了判定              │
 ├────────────────────────────────────────────────────┤
 │  出力レイヤー (Output Layer)                         │
-│  HeatmapRenderer + DisplayController                │
-│  ヒートマップ生成・画面表示                           │
+│  HeatmapRenderer + DebugImageSaver                  │
+│  ヒートマップ生成・デバッグ画像保存                   │
 ├────────────────────────────────────────────────────┤
 │  データレイヤー (Data Layer)                         │
 │  DataStorage                                        │
@@ -67,7 +67,7 @@ GridTracker
     ↓        ↘
 HeatmapRenderer  DataStorage
     ↓
-DisplayController
+DebugImageSaver（debug モード時のみ）
 ```
 
 **依存方向の原則**:
@@ -106,6 +106,68 @@ DisplayController
 - **頻度**: フレームごとに `session.json` を上書き保存（都度保存）
 - **世代管理**: セッションID（日時）でディレクトリ分割のため自動的に世代管理
 - **復元方法**: `data/sessions/{session_id}/session.json` を直接読み込む
+
+---
+
+## スレッド・プロセス構成
+
+### 概要
+
+アプリケーションは **シングルプロセス・シングルスレッド** で動作する。並行処理は行わない。
+
+```
+OS プロセス (python src/main.py)
+└── メインスレッド（唯一のスレッド）
+    ├── 初期化フェーズ
+    │   ├── CameraManager.__init__()     ← cv2.VideoCapture で各カメラに接続
+    │   ├── CalibrationManager.load_config()
+    │   └── HandDetector.__init__()      ← MediaPipe モデルをメモリにロード
+    └── メインループ（while True）
+        ├── CameraManager.get_frames()   ← 各カメラから cap.read() を逐次呼び出し
+        ├── HandDetector.detect()        ← MediaPipe VIDEO モードで同期推論
+        ├── GridTracker.update()
+        ├── HeatmapRenderer.render()
+        ├── DataStorage.save_session()   ← JSON / PNG を同期書き込み
+        └── [debug モード時] DebugImageSaver.save()  ← outputs/debug.jpg を上書き
+```
+
+### 各コンポーネントのスレッド特性
+
+| コンポーネント | スレッド動作 | 備考 |
+|---|---|---|
+| `CameraManager` | 同期（ブロッキング） | `cap.read()` はフレーム取得まで待機。OpenCV 内部はバックグラウンドスレッドでキャプチャするが、API は同期的 |
+| `HandDetector` | 同期（ブロッキング） | MediaPipe `RunningMode.VIDEO` を使用。`detect_for_video()` は結果を直接返す（コールバック不使用）。`RunningMode.LIVE_STREAM` への変更でコールバック非同期化が可能だが現状は同期 |
+| `GridTracker` | スレッドセーフでない | 単一スレッドからのみ呼び出される前提。ロック機構なし |
+| `DataStorage` | 同期（ブロッキング） | ファイルI/Oはメインスレッドで同期実行。書き込み失敗はログ記録のみで処理継続 |
+| `HeatmapRenderer` | 同期 | NumPy / OpenCV 演算のみ。副作用なし |
+| `DebugImageSaver` | 同期 | `cv2.imwrite()` で同期書き込み。1 秒間隔は呼び出し元の `time.time()` 差分で制御 |
+
+### 2カメラの処理順序
+
+カメラ 0 と カメラ 1 のフレーム取得・推論は **逐次実行**（並列ではない）。
+
+```
+フレームN:
+  cap[0].read()  →  HandDetector.detect(cam=0)
+  cap[1].read()  →  HandDetector.detect(cam=1)
+  ↓
+  全カメラの HandPosition をリストにマージ
+  ↓
+  GridTracker.update(merged_positions)
+```
+
+MediaPipe のタイムスタンプは `time.time()` ベースで単調増加を保証しており、同一ループ内での複数カメラ呼び出しでタイムスタンプが衝突した場合は `+1ms` で調整している（`HandDetector.detect()` 内）。
+
+### 終了シーケンス
+
+```
+KeyboardInterrupt (Ctrl+C)
+  ↓
+finally ブロック
+  ├── DataStorage.save_session()   ← 最終セッションデータ保存
+  ├── HandDetector.close()         ← MediaPipe リソース解放
+  └── CameraManager.release()      ← cv2.VideoCapture リソース解放
+```
 
 ---
 

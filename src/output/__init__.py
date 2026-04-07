@@ -1,4 +1,4 @@
-from .display_controller import DisplayController
+from .display_controller import DebugImageSaver
 from .heatmap_renderer import HeatmapRenderer
 
-__all__ = ["DisplayController", "HeatmapRenderer"]
+__all__ = ["DebugImageSaver", "HeatmapRenderer"]
