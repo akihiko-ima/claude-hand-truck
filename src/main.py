@@ -78,16 +78,16 @@ def main() -> None:
     # キャリブレーション設定の読み込みまたは実施
     calibrations = {}
     for cam_id in CAMERA_IDS:
-        config = calib_manager.load_config(cam_id)
-        if config is None:
+        calib_config = calib_manager.load_config(cam_id)
+        if calib_config is None:
             console.print(f"[yellow]カメラ {cam_id} のキャリブレーション設定が見つかりません。キャリブレーションを開始します。[/]")
             frames = camera_manager.get_frames()
             if cam_id not in frames:
                 console.print(f"[bold red]カメラ {cam_id} が接続されていません。終了します。[/]")
                 camera_manager.release()
                 return
-            config = calib_manager.run_calibration(cam_id, frames[cam_id])
-        calibrations[cam_id] = config
+            calib_config = calib_manager.run_calibration(cam_id, frames[cam_id])
+        calibrations[cam_id] = calib_config
         console.print(f"[green]✓ カメラ {cam_id} のキャリブレーション設定を読み込みました。[/]")
 
     # MediaPipe 手検出エンジンの初期化

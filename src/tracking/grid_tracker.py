@@ -13,20 +13,20 @@ class GridTracker:
 
     def __init__(
         self,
-        rows: int = 2,
-        cols: int = 12,
+        rows: int = 3,
+        cols: int = 7,
         clean_threshold_seconds: float = 5.0,
     ) -> None:
-        self.ROWS = rows
-        self.COLS = cols
-        self.CLEAN_THRESHOLD_SECONDS = clean_threshold_seconds
+        self._rows = rows
+        self._cols = cols
+        self._clean_threshold_seconds = clean_threshold_seconds
         self._grid = self._create_grid()
 
     def _create_grid(self) -> list[list[GridCell]]:
         """全セルを初期状態で生成する。"""
         return [
-            [GridCell(row=r, col=c) for c in range(self.COLS)]
-            for r in range(self.ROWS)
+            [GridCell(row=r, col=c) for c in range(self._cols)]
+            for r in range(self._rows)
         ]
 
     def update(self, hand_positions: list[HandPosition], delta_time: float) -> None:
@@ -48,7 +48,7 @@ class GridTracker:
             cell = self._grid[row][col]
             cell.accumulated_seconds += delta_time
             cell.last_hand_detected_at = time.time()
-            cell.is_cleaned = cell.accumulated_seconds >= self.CLEAN_THRESHOLD_SECONDS
+            cell.is_cleaned = cell.accumulated_seconds >= self._clean_threshold_seconds
 
     def get_grid(self) -> list[list[GridCell]]:
         """現在のグリッド状態を返す。"""
@@ -58,7 +58,7 @@ class GridTracker:
         """清掃完了率を返す（0.0〜1.0）。
 
         Returns:
-            清掃済みセル数 / 24
+            清掃済みセル数 / (rows × cols)
         """
         cleaned = sum(
             1
@@ -66,7 +66,7 @@ class GridTracker:
             for cell in row
             if cell.is_cleaned
         )
-        return cleaned / (self.ROWS * self.COLS)
+        return cleaned / (self._rows * self._cols)
 
     def reset(self) -> None:
         """グリッドを初期状態にリセットする（セッション開始時に使用）。"""
@@ -83,8 +83,8 @@ class GridTracker:
         Returns:
             (row, col) タプル
         """
-        col = min(int(position.x_normalized * self.COLS), self.COLS - 1)
-        row = min(int(position.y_normalized * self.ROWS), self.ROWS - 1)
+        col = min(int(position.x_normalized * self._cols), self._cols - 1)
+        row = min(int(position.y_normalized * self._rows), self._rows - 1)
         # 負の値は0に丸める
         col = max(col, 0)
         row = max(row, 0)

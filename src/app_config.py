@@ -13,7 +13,7 @@ from pathlib import Path
 class GridConfig:
     rows: int = 3
     cols: int = 7
-    clean_threshold_seconds: float = 3.0
+    clean_threshold_seconds: float = 5.0
 
 
 @dataclass
@@ -32,19 +32,15 @@ def load_config(path: Path = Path("config.toml")) -> AppConfig:
     Returns:
         AppConfig インスタンス
     """
-    if not path.exists():
+    try:
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+    except FileNotFoundError:
         return AppConfig()
 
-    with open(path, "rb") as f:
-        data = tomllib.load(f)
-
     grid_data = data.get("grid", {})
-    defaults = GridConfig()
-    grid = GridConfig(
-        rows=grid_data.get("rows", defaults.rows),
-        cols=grid_data.get("cols", defaults.cols),
-        clean_threshold_seconds=grid_data.get(
-            "clean_threshold_seconds", defaults.clean_threshold_seconds
-        ),
-    )
-    return AppConfig(grid=grid)
+    return AppConfig(grid=GridConfig(
+        rows=grid_data.get("rows", 3),
+        cols=grid_data.get("cols", 7),
+        clean_threshold_seconds=grid_data.get("clean_threshold_seconds", 5.0),
+    ))

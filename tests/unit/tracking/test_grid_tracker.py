@@ -20,11 +20,11 @@ def make_position(x: float, y: float, camera_id: int = 0) -> HandPosition:
 
 
 class TestGridTrackerInit:
-    def test_grid_is_2x12_on_init(self) -> None:
+    def test_grid_is_3x7_on_init(self) -> None:
         tracker = GridTracker()
         grid = tracker.get_grid()
-        assert len(grid) == 2
-        assert all(len(row) == 12 for row in grid)
+        assert len(grid) == 3
+        assert all(len(row) == 7 for row in grid)
 
     def test_grid_size_is_configurable(self) -> None:
         tracker = GridTracker(rows=3, cols=6)
@@ -54,9 +54,9 @@ class TestGridTrackerUpdate:
 
     def test_update_increments_detected_cell(self) -> None:
         tracker = GridTracker()
-        pos = make_position(x=0.5, y=0.5)  # col=6, row=1
+        pos = make_position(x=0.5, y=0.5)  # col=3, row=1
         tracker.update([pos], delta_time=2.0)
-        cell = tracker.get_grid()[1][6]
+        cell = tracker.get_grid()[1][3]
         assert cell.accumulated_seconds == pytest.approx(2.0)
 
     def test_update_does_not_increment_undetected_cell(self) -> None:
@@ -93,14 +93,14 @@ class TestGridTrackerUpdate:
         # col=0, row=0 だけ清掃済みにする
         pos = make_position(x=0.0, y=0.0)
         tracker.update([pos], delta_time=5.0)
-        assert tracker.get_cleaning_rate() == pytest.approx(1 / 24)
+        assert tracker.get_cleaning_rate() == pytest.approx(1 / 21)
 
     def test_cleaning_rate_is_1_when_all_cells_cleaned(self) -> None:
         tracker = GridTracker()
-        for r in range(2):
-            for c in range(12):
-                x = (c + 0.5) / 12
-                y = (r + 0.5) / 2
+        for r in range(3):
+            for c in range(7):
+                x = (c + 0.5) / 7
+                y = (r + 0.5) / 3
                 pos = make_position(x=x, y=y)
                 tracker.update([pos], delta_time=5.0)
         assert tracker.get_cleaning_rate() == pytest.approx(1.0)
@@ -114,18 +114,18 @@ class TestGridTrackerPositionToCell:
         assert row == 0
         assert col == 0
 
-    def test_bottom_right_corner_maps_to_row1_col11(self) -> None:
+    def test_bottom_right_corner_maps_to_row2_col6(self) -> None:
         tracker = GridTracker()
         pos = make_position(x=0.999, y=0.999)
         row, col = tracker._position_to_cell(pos)
-        assert row == 1
-        assert col == 11
+        assert row == 2
+        assert col == 6
 
     def test_out_of_range_x_is_clamped(self) -> None:
         tracker = GridTracker()
         pos = make_position(x=1.5, y=0.0)
         row, col = tracker._position_to_cell(pos)
-        assert col == 11  # 最大値にクランプ
+        assert col == 6  # 最大値にクランプ
 
     def test_negative_x_is_clamped(self) -> None:
         tracker = GridTracker()
@@ -138,7 +138,7 @@ class TestGridTrackerPositionToCell:
         pos = make_position(x=0.5, y=0.5)
         row, col = tracker._position_to_cell(pos)
         assert row == 1
-        assert col == 6
+        assert col == 3
 
 
 class TestGridTrackerReset:
