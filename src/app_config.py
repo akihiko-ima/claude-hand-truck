@@ -21,13 +21,13 @@ class AppConfig:
     grid: GridConfig = field(default_factory=GridConfig)
 
 
-def load_config(path: Path = Path("config.toml")) -> AppConfig:
+def load_config(path: Path = Path("config/config.toml")) -> AppConfig:
     """TOML ファイルからアプリケーション設定を読み込む。
 
     ファイルが存在しない場合はデフォルト値の AppConfig を返す。
 
     Args:
-        path: config.toml のパス（デフォルト: プロジェクトルートの config.toml）
+        path: config.toml のパス（デフォルト: config/config.toml）
 
     Returns:
         AppConfig インスタンス
