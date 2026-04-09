@@ -29,6 +29,7 @@ from src.models.calibration_config import CalibrationConfig
 from src.output.heatmap_renderer import HeatmapRenderer
 from src.pipeline.csv_writer_task import CsvWriterTask
 from src.pipeline.queue_monitor_task import QueueMonitorTask
+from src.pipeline.zmq_sender_task import ZmqSenderTask
 from src.pipeline.tracking_task import TrackingAndStorageTask
 from src.storage.data_storage import DataStorage
 from src.tracking.grid_tracker import GridTracker
@@ -39,11 +40,12 @@ logger = logging.getLogger(__name__)
 class HandDetectionPipeline:
     """手検出パイプラインのオーケストレーター。
 
-    通常モードのスレッド構成（3〜4本）:
+    通常モードのスレッド構成（3〜5本）:
         SyncCameraReadTask      × 1  FPS固定で2台のカメラを同期読み込み
         PriorityHandDetectTask  × 1  優先カメラ→セカンダリのフォールバック検出
         TrackingAndStorageTask  × 1  グリッド更新・ヒートマップ生成・セッション保存
         CsvWriterTask           × 1  手のキーポイントをCSVに記録（csv.enabled 時のみ）
+        ZmqSenderTask           × 1  グリッド座標を ZeroMQ PUSH で送信（zmq.enabled 時のみ）
 
     デバッグモード追加スレッド（debug 引数指定時のみ）:
         QueueMonitorTask        × 1  各キューのサイズを1秒ごとにログ出力
@@ -56,6 +58,8 @@ class HandDetectionPipeline:
                      maxsize=0（無制限）
         csv_queue    PriorityHandDetectTask → CsvWriterTask（ファンアウト）
                      maxsize=0（無制限）、csv.enabled=false の場合は生成しない
+        zmq_queue    PriorityHandDetectTask → ZmqSenderTask（ファンアウト）
+                     maxsize=0（無制限）、zmq.enabled=false の場合は生成しない
     """
 
     def __init__(
@@ -109,6 +113,12 @@ class HandDetectionPipeline:
             queue.Queue(maxsize=0) if self._config.csv.enabled else None
         )
 
+        # zmq_queue: result_queue からのファンアウト。
+        #            config.zmq.enabled=false の場合は生成しない（None のまま）。
+        zmq_queue: queue.Queue | None = (
+            queue.Queue(maxsize=0) if self._config.zmq.enabled else None
+        )
+
         # ---- ビジネスロジックコンポーネントの初期化 -------------------------
         storage = DataStorage()
         session = storage.create_session(
@@ -148,6 +158,8 @@ class HandDetectionPipeline:
         }
         if csv_queue is not None:
             monitor_queues["CsvQ"] = csv_queue
+        if zmq_queue is not None:
+            monitor_queues["ZmqQ"] = zmq_queue
 
         # 常時起動するスレッド（通常モード・デバッグモード共通）
         self._threads = [
@@ -168,6 +180,7 @@ class HandDetectionPipeline:
                 hand_config=self._config.hand_detection,
                 debug_mode=self._debug_mode,
                 csv_queue=csv_queue,        # None の場合はファンアウトしない
+                zmq_queue=zmq_queue,        # None の場合はファンアウトしない
             ),
             self._tracking_task,
         ]
@@ -185,6 +198,16 @@ class HandDetectionPipeline:
                 csv_queue=csv_queue,
                 stop_event=self._stop_event,
                 output_path=self._config.csv.output_path,
+            ))
+
+        # ZeroMQ 送信スレッド（config.zmq.enabled=true の場合のみ起動）
+        if zmq_queue is not None:
+            self._threads.append(ZmqSenderTask(
+                zmq_queue=zmq_queue,
+                stop_event=self._stop_event,
+                endpoint=self._config.zmq.endpoint,
+                grid_rows=grid_cfg.rows,
+                grid_cols=grid_cfg.cols,
             ))
 
         for t in self._threads:

@@ -165,6 +165,16 @@ uv run scripts/setup_calibration.py
 シングルカメラで運用する場合は `src/main.py` の `CAMERA_IDS = [0]` に変更する。
 
 ---
+## 記録したデータの動画(mp4)確認
+```bash
+uv run .\tools\animate_hand.py --csv .\data\hand_landmarks.csv --save .\outputs\output.mp4
+```
+
+## zmqClient sample
+```bash
+uv run .\tools\sample_zmq_client.py
+```
+
 
 ## テスト
 

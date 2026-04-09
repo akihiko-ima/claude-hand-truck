@@ -40,11 +40,18 @@ class CsvConfig:
 
 
 @dataclass
+class ZmqConfig:
+    enabled: bool = True
+    endpoint: str = "tcp://*:5555"
+
+
+@dataclass
 class AppConfig:
     grid: GridConfig = field(default_factory=GridConfig)
     hand_detection: HandDetectionConfig = field(default_factory=HandDetectionConfig)
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
     csv: CsvConfig = field(default_factory=CsvConfig)
+    zmq: ZmqConfig = field(default_factory=ZmqConfig)
 
 
 def load_config(path: Path = Path("config/config.toml")) -> AppConfig:
@@ -68,6 +75,7 @@ def load_config(path: Path = Path("config/config.toml")) -> AppConfig:
     hd_data = data.get("hand_detection", {})
     pl_data = data.get("pipeline", {})
     csv_data = data.get("csv", {})
+    zmq_data = data.get("zmq", {})
     return AppConfig(
         grid=GridConfig(
             rows=grid_data.get("rows", 3),
@@ -90,5 +98,9 @@ def load_config(path: Path = Path("config/config.toml")) -> AppConfig:
         csv=CsvConfig(
             enabled=bool(csv_data.get("enabled", True)),
             output_path=str(csv_data.get("output_path", "data/hand_landmarks.csv")),
+        ),
+        zmq=ZmqConfig(
+            enabled=bool(zmq_data.get("enabled", True)),
+            endpoint=str(zmq_data.get("endpoint", "tcp://*:5555")),
         ),
     )

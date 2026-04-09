@@ -60,6 +60,7 @@ class PriorityHandDetectTask(threading.Thread):
         model_path: Path | None = None,
         debug_mode: bool = False,
         csv_queue: queue.Queue | None = None,
+        zmq_queue: queue.Queue | None = None,
     ) -> None:
         super().__init__(name="PriorityHandDetectTask", daemon=True)
 
@@ -84,6 +85,7 @@ class PriorityHandDetectTask(threading.Thread):
         self._model_path = str(model_path or _MODEL_PATH)
         self._debug_mode = debug_mode
         self._csv_queue = csv_queue
+        self._zmq_queue = zmq_queue
 
     def _create_detector(self) -> mp_vision.HandLandmarker:
         """IMAGE モードの HandLandmarker インスタンスを生成する。"""
@@ -141,7 +143,7 @@ class PriorityHandDetectTask(threading.Thread):
             if calib is not None:
                 x_norm, y_norm = self._calib_manager.transform_point(calib, px, py)
             else:
-                x_norm, y_norm = wrist.x, wrist.y
+                x_norm, y_norm = ref_point.x, ref_point.y
 
             positions.append(HandPosition(
                 x_normalized=x_norm,
@@ -284,6 +286,8 @@ class PriorityHandDetectTask(threading.Thread):
                     self._result_queue.put(result_item)
                     if self._csv_queue is not None:
                         self._csv_queue.put(result_item)
+                    if self._zmq_queue is not None:
+                        self._zmq_queue.put(result_item)
 
         except Exception:
             logger.error("PriorityHandDetectTask で例外が発生しました")
