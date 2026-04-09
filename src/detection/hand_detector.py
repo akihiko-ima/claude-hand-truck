@@ -114,6 +114,10 @@ class HandDetector:
             # キャリブレーション変換でテーブル正規化座標に変換
             x_norm, y_norm = self._calib_manager.transform_point(calib, px, py)
 
+            # ROI（テーブル領域）外の手は積算対象外とする
+            if not (0.0 <= x_norm <= 1.0 and 0.0 <= y_norm <= 1.0):
+                continue
+
             confidence = handedness[0].score
 
             positions.append(

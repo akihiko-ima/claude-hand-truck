@@ -187,6 +187,6 @@ class CalibrationManager:
 
         src = np.array([[[px, py]]], dtype=np.float32)
         dst = cv2.perspectiveTransform(src, config.homography_matrix)
-        x_norm = float(np.clip(dst[0][0][0], 0.0, 1.0))
-        y_norm = float(np.clip(dst[0][0][1], 0.0, 1.0))
+        x_norm = float(dst[0][0][0])
+        y_norm = float(dst[0][0][1])
         return x_norm, y_norm

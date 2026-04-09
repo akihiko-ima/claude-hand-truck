@@ -20,7 +20,7 @@ class DataStorage:
     ヒートマップ画像はPNG形式で同一ディレクトリに保存する。
     """
 
-    BASE_DIR = "data/sessions"
+    BASE_DIR = "logs/sessions"
 
     def __init__(self) -> None:
         Path(self.BASE_DIR).mkdir(parents=True, exist_ok=True)

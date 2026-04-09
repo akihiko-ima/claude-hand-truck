@@ -36,7 +36,7 @@ class PipelineConfig:
 @dataclass
 class CsvConfig:
     enabled: bool = True
-    output_path: str = "data/hand_landmarks.csv"
+    output_path: str = "logs/hand_landmarks.csv"
 
 
 @dataclass
@@ -97,7 +97,7 @@ def load_config(path: Path = Path("config/config.toml")) -> AppConfig:
         ),
         csv=CsvConfig(
             enabled=bool(csv_data.get("enabled", True)),
-            output_path=str(csv_data.get("output_path", "data/hand_landmarks.csv")),
+            output_path=str(csv_data.get("output_path", "logs/hand_landmarks.csv")),
         ),
         zmq=ZmqConfig(
             enabled=bool(zmq_data.get("enabled", True)),

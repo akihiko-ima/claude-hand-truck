@@ -18,7 +18,7 @@ camera_ids = [0, 1]
 
 [csv]
 enabled = true
-output_path = "data/hand_landmarks.csv"
+output_path = "logs/hand_landmarks.csv"
 
 [zmq]
 enabled = true

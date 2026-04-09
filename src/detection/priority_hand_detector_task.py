@@ -142,6 +142,9 @@ class PriorityHandDetectTask(threading.Thread):
 
             if calib is not None:
                 x_norm, y_norm = self._calib_manager.transform_point(calib, px, py)
+                # ROI（テーブル領域）外の手は積算対象外とする
+                if not (0.0 <= x_norm <= 1.0 and 0.0 <= y_norm <= 1.0):
+                    continue
             else:
                 x_norm, y_norm = ref_point.x, ref_point.y
 

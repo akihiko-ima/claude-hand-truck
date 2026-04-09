@@ -35,7 +35,7 @@ class CsvWriterTask(threading.Thread):
         self,
         csv_queue: queue.Queue,
         stop_event: threading.Event,
-        output_path: str = "data/hand_landmarks.csv",
+        output_path: str = "logs/hand_landmarks.csv",
     ) -> None:
         super().__init__(name="CsvWriterTask", daemon=True)
         self._csv_queue = csv_queue
