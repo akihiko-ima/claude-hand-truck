@@ -113,60 +113,82 @@ DebugImageSaver（debug モード時のみ）
 
 ### 概要
 
-アプリケーションは **シングルプロセス・シングルスレッド** で動作する。並行処理は行わない。
+アプリケーションは **シングルプロセス・マルチスレッド** で動作する。
+Producer-Consumer パターンでスレッドを分離し、FPS固定化と優先カメラ検出を実現する。
 
 ```
 OS プロセス (python src/main.py)
-└── メインスレッド（唯一のスレッド）
-    ├── 初期化フェーズ
-    │   ├── CameraManager.__init__()     ← cv2.VideoCapture で各カメラに接続
-    │   ├── CalibrationManager.load_config()
-    │   └── HandDetector.__init__()      ← MediaPipe モデルをメモリにロード
-    └── メインループ（while True）
-        ├── CameraManager.get_frames()   ← 各カメラから cap.read() を逐次呼び出し
-        ├── HandDetector.detect()        ← MediaPipe VIDEO モードで同期推論
-        ├── GridTracker.update()
-        ├── HeatmapRenderer.render()
-        ├── DataStorage.save_session()   ← JSON / PNG を同期書き込み
-        └── [debug モード時] DebugImageSaver.save()  ← outputs/debug.jpg を上書き
+├── メインスレッド
+│   ├── 初期化（CalibrationManager, HandDetectionPipeline 生成）
+│   └── pipeline.wait() でブロック（Ctrl+C 受け付け）
+├── SyncCameraReadTask（daemon スレッド）
+│   ├── 高精度タイマー（perf_counter）で target_fps を固定
+│   └── frame_queue に SyncFrameItem を push
+├── PriorityHandDetectTask（daemon スレッド）
+│   ├── ThreadPoolExecutor(max_workers=2) で priority/secondary カメラを並列推論
+│   ├── MediaPipe IMAGE モード（カメラ別インスタンス、ステートレス）
+│   ├── 優先度ロジック: priority → secondary → []
+│   └── result_queue に DetectionResultItem を push
+├── TrackingAndStorageTask（daemon スレッド）
+│   ├── GridTracker.update(hand_positions, 1.0/target_fps)
+│   ├── HeatmapRenderer.render(grid)
+│   └── DataStorage.save_session(session, heatmap)
+└── QueueMonitorTask（daemon スレッド）
+    └── 1秒ごとに各キューのサイズをログ出力
+```
+
+### スレッド間データフロー
+
+```
+SyncCameraReadTask
+    ↓ frame_queue（Queue[SyncFrameItem], maxsize=300）
+PriorityHandDetectTask
+    ↓ result_queue（Queue[DetectionResultItem], maxsize=無制限）
+TrackingAndStorageTask
 ```
 
 ### 各コンポーネントのスレッド特性
 
-| コンポーネント | スレッド動作 | 備考 |
+| コンポーネント | スレッド | 備考 |
 |---|---|---|
-| `CameraManager` | 同期（ブロッキング） | `cap.read()` はフレーム取得まで待機。OpenCV 内部はバックグラウンドスレッドでキャプチャするが、API は同期的 |
-| `HandDetector` | 同期（ブロッキング） | MediaPipe `RunningMode.VIDEO` を使用。`detect_for_video()` は結果を直接返す（コールバック不使用）。`RunningMode.LIVE_STREAM` への変更でコールバック非同期化が可能だが現状は同期 |
-| `GridTracker` | スレッドセーフでない | 単一スレッドからのみ呼び出される前提。ロック機構なし |
-| `DataStorage` | 同期（ブロッキング） | ファイルI/Oはメインスレッドで同期実行。書き込み失敗はログ記録のみで処理継続 |
-| `HeatmapRenderer` | 同期 | NumPy / OpenCV 演算のみ。副作用なし |
-| `DebugImageSaver` | 同期 | `cv2.imwrite()` で同期書き込み。1 秒間隔は呼び出し元の `time.time()` 差分で制御 |
+| `SyncCameraReadTask` | 専用スレッド | `cap.read()` を逐次呼び出し。perf_counter でFPS固定 |
+| `PriorityHandDetectTask` | 専用スレッド + 内部 Executor | MediaPipe IMAGE モード。カメラ別インスタンスで並列推論 |
+| `GridTracker` | TrackingAndStorageTask のみ | スレッドセーフでない。TrackingAndStorageTask 専有 |
+| `DataStorage` | TrackingAndStorageTask のみ | ファイルI/Oは TrackingAndStorageTask で同期実行 |
+| `HeatmapRenderer` | TrackingAndStorageTask のみ | NumPy / OpenCV 演算のみ。副作用なし |
 
-### 2カメラの処理順序
+### FPS固定の仕組み
 
-カメラ 0 と カメラ 1 のフレーム取得・推論は **逐次実行**（並列ではない）。
+- `SyncCameraReadTask` が `time.perf_counter()` ベースの高精度タイマーで間隔を制御
+- 処理落ち時はドリフト防止のためタイマーをリセット
+- `GridTracker.update()` の `delta_time` は `1.0 / target_fps` の定数を使用
+
+### 優先カメラ検出ロジック
 
 ```
-フレームN:
-  cap[0].read()  →  HandDetector.detect(cam=0)
-  cap[1].read()  →  HandDetector.detect(cam=1)
-  ↓
-  全カメラの HandPosition をリストにマージ
-  ↓
-  GridTracker.update(merged_positions)
+priority カメラで右手検出
+  ↓ 成功 → その HandPosition を採用（secondary の結果は破棄）
+  ↓ 失敗
+secondary カメラで右手検出
+  ↓ 成功 → その HandPosition を採用
+  ↓ 失敗
+空の HandPosition リスト（グリッド更新なし）
 ```
-
-MediaPipe のタイムスタンプは `time.time()` ベースで単調増加を保証しており、同一ループ内での複数カメラ呼び出しでタイムスタンプが衝突した場合は `+1ms` で調整している（`HandDetector.detect()` 内）。
 
 ### 終了シーケンス
 
 ```
 KeyboardInterrupt (Ctrl+C)
   ↓
-finally ブロック
-  ├── DataStorage.save_session()   ← 最終セッションデータ保存
-  ├── HandDetector.close()         ← MediaPipe リソース解放
-  └── CameraManager.release()      ← cv2.VideoCapture リソース解放
+pipeline.stop() が _stop_event.set() を呼び出し
+  ↓
+各 daemon スレッドが stop_event を検知して終了
+  ↓
+TrackingAndStorageTask.finally → 最終セッションデータを保存
+  ↓
+PriorityHandDetectTask.finally → detector.close() でMediaPipeリソース解放
+  ↓
+SyncCameraReadTask.finally → cap.release() でカメラリソース解放
 ```
 
 ---

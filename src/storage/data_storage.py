@@ -25,24 +25,23 @@ class DataStorage:
     def __init__(self) -> None:
         Path(self.BASE_DIR).mkdir(parents=True, exist_ok=True)
 
-    def create_session(self, table_id: str) -> CleaningSession:
+    def create_session(self, table_id: str, rows: int = 3, cols: int = 7) -> CleaningSession:
         """新しい清掃セッションを作成する。
 
         Args:
             table_id: テーブル識別子（例: "table_01"）
+            rows: グリッドの行数
+            cols: グリッドの列数
 
         Returns:
             初期化済みの CleaningSession
         """
-        from src.models.grid_cell import GridCell
-
         session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         started_at = datetime.now().isoformat()
 
-        # 2×12のグリッドを初期化
         grid_cells = [
-            [GridCell(row=r, col=c) for c in range(12)]
-            for r in range(2)
+            [GridCell(row=r, col=c) for c in range(cols)]
+            for r in range(rows)
         ]
 
         session = CleaningSession(

@@ -18,8 +18,9 @@ class DebugImageSaver:
     outputs/debug.jpg へ上書き保存する。
     """
 
-    def __init__(self, outputs_dir: Path) -> None:
+    def __init__(self, outputs_dir: Path, total_cells: int = 21) -> None:
         self._outputs_dir = outputs_dir
+        self._total_cells = total_cells
         self._alert_shown_at: float | None = None
 
     def save(
@@ -81,8 +82,8 @@ class DebugImageSaver:
     def _create_status_bar(self, width: int, cleaning_rate: float) -> np.ndarray:
         """清掃完了率を表示するステータスバーを生成する。"""
         bar = np.zeros((50, width, 3), dtype=np.uint8)
-        cleaned_cells = round(cleaning_rate * 24)
-        text = f"Cleaning: {cleaned_cells}/24 ({cleaning_rate * 100:.1f}%)"
+        cleaned_cells = round(cleaning_rate * self._total_cells)
+        text = f"Cleaning: {cleaned_cells}/{self._total_cells} ({cleaning_rate * 100:.1f}%)"
         cv2.putText(
             bar, text, (10, 35),
             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2,
