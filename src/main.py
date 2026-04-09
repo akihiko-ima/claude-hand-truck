@@ -93,7 +93,7 @@ def main() -> None:
     # MediaPipe 手検出エンジンの初期化
     try:
         with console.status("[cyan]手検出エンジンを初期化しています...[/]", spinner="dots"):
-            detector = HandDetector(calib_manager)
+            detector = HandDetector(calib_manager, hand_config=config.hand_detection)
     except RuntimeError as e:
         console.print(f"[bold red]{e}[/]")
         camera_manager.release()

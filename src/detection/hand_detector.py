@@ -6,6 +6,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
+from src.app_config import HandDetectionConfig
 from src.detection.calibration_manager import CalibrationManager
 from src.models.calibration_config import CalibrationConfig
 from src.models.hand_position import HandPosition
@@ -32,16 +33,19 @@ class HandDetector:
         self,
         calibration_manager: CalibrationManager,
         model_path: Path | None = None,
+        hand_config: HandDetectionConfig | None = None,
     ) -> None:
         """MediaPipe HandLandmarkerを初期化する。
 
         Args:
             calibration_manager: 座標変換に使用するキャリブレーションマネージャー
             model_path: hand_landmarker.task モデルファイルのパス（省略時はデフォルト）
+            hand_config: 手検出設定（省略時はデフォルト値）
         """
         self._calib_manager = calibration_manager
-        self._last_results = None
+        self._config = hand_config or HandDetectionConfig()
         self._last_timestamp_ms: int = -1
+        self._last_filtered_landmarks: list = []
 
         path = model_path or _MODEL_PATH
 
@@ -49,10 +53,10 @@ class HandDetector:
             options = mp.tasks.vision.HandLandmarkerOptions(
                 base_options=mp.tasks.BaseOptions(model_asset_path=str(path)),
                 running_mode=mp.tasks.vision.RunningMode.VIDEO,
-                num_hands=2,
-                min_hand_detection_confidence=0.5,
-                min_hand_presence_confidence=0.5,
-                min_tracking_confidence=0.5,
+                num_hands=self._config.num_hands,
+                min_hand_detection_confidence=self._config.min_detection_confidence,
+                min_hand_presence_confidence=self._config.min_presence_confidence,
+                min_tracking_confidence=self._config.min_tracking_confidence,
             )
             self._detector = mp.tasks.vision.HandLandmarker.create_from_options(options)
         except Exception as e:
@@ -85,16 +89,23 @@ class HandDetector:
         self._last_timestamp_ms = timestamp_ms
 
         results = self._detector.detect_for_video(mp_image, timestamp_ms)
-        self._last_results = results
 
         if not results.hand_landmarks:
+            self._last_filtered_landmarks = []
             return []
 
         positions: list[HandPosition] = []
+        filtered_landmarks: list = []
         h, w = frame.shape[:2]
         timestamp = time.time()
 
         for hand_landmarks, handedness in zip(results.hand_landmarks, results.handedness):
+            # right_hand_only が有効な場合、右手（"Right"）以外をスキップ
+            if self._config.right_hand_only and handedness[0].category_name != "Right":
+                continue
+
+            filtered_landmarks.append(hand_landmarks)
+
             # 手首（landmark 0）の座標をピクセル座標に変換
             wrist = hand_landmarks[0]
             px = int(wrist.x * w)
@@ -115,6 +126,7 @@ class HandDetector:
                 )
             )
 
+        self._last_filtered_landmarks = filtered_landmarks
         return positions
 
     def draw_landmarks(
@@ -130,11 +142,11 @@ class HandDetector:
             描画済みフレーム
         """
         result = frame.copy()
-        if self._last_results is None or not self._last_results.hand_landmarks:
+        if not self._last_filtered_landmarks:
             return result
 
         h, w = frame.shape[:2]
-        for hand_landmarks in self._last_results.hand_landmarks:
+        for hand_landmarks in self._last_filtered_landmarks:
             pts = [(int(lm.x * w), int(lm.y * h)) for lm in hand_landmarks]
             for start, end in _HAND_CONNECTIONS:
                 cv2.line(result, pts[start], pts[end], (0, 255, 0), 2)
