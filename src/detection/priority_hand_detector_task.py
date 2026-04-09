@@ -134,9 +134,9 @@ class PriorityHandDetectTask(threading.Thread):
             if not first_raw_landmarks:
                 first_raw_landmarks = [(lm.x, lm.y, lm.z) for lm in hand_landmarks]
 
-            wrist = hand_landmarks[0]
-            px = int(wrist.x * w)
-            py = int(wrist.y * h)
+            ref_point = hand_landmarks[9]  # 中指MCP関節（中指付け根）
+            px = int(ref_point.x * w)
+            py = int(ref_point.y * h)
 
             if calib is not None:
                 x_norm, y_norm = self._calib_manager.transform_point(calib, px, py)
