@@ -125,6 +125,9 @@ uv run src/main.py
 
 # デバッグモード（outputs/debug.jpg を1秒ごとに上書き保存）
 uv run src/main.py debug
+
+# ログモード（DEBUGレベル全出力をターミナルに表示）
+uv run src/main.py log
 ```
 
 ### 起動後の流れ
@@ -167,7 +170,7 @@ uv run scripts/setup_calibration.py
 ---
 ## 記録したデータの動画(mp4)確認
 ```bash
-uv run .\tools\animate_hand.py --csv .\data\hand_landmarks.csv --save .\outputs\output.mp4
+uv run .\tools\animate_hand.py --csv .\logs\hand_landmarks.csv --save .\outputs\output.mp4
 ```
 
 ## zmqClient sample

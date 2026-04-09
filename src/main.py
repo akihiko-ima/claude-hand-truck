@@ -20,10 +20,6 @@ from src.app_config import load_config
 from src.detection.calibration_manager import CalibrationManager
 from src.pipeline.pipeline import HandDetectionPipeline
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 console = Console()
@@ -78,6 +74,12 @@ def _run_calibration(config, calib_manager: CalibrationManager) -> dict | None:
 def main() -> None:
     """CleanTrack メインエントリーポイント。"""
     debug_mode = "debug" in sys.argv
+    log_mode = "log" in sys.argv
+
+    logging.basicConfig(
+        level=logging.DEBUG if log_mode else logging.WARNING,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
 
     console.print(Panel(
         Text("CleanTrack 清掃モニタリング", justify="center"),
@@ -87,6 +89,8 @@ def main() -> None:
 
     if debug_mode:
         console.print("[yellow]デバッグモード: 画像を outputs/debug.jpg に1秒ごとに保存します[/]")
+    if log_mode:
+        console.print("[yellow]ログモード: DEBUGレベルのログをターミナルに出力します[/]")
 
     config = load_config()
     calib_manager = CalibrationManager()
@@ -101,6 +105,7 @@ def main() -> None:
         calibrations=calibrations,
         table_id=TABLE_ID,
         debug_mode=debug_mode,
+        log_mode=log_mode,
     )
 
     try:

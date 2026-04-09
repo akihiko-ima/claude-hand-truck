@@ -69,6 +69,7 @@ class HandDetectionPipeline:
         calibrations: dict[int, CalibrationConfig],
         table_id: str = "table_01",
         debug_mode: bool = False,
+        log_mode: bool = False,
     ) -> None:
         """パイプラインを初期化する。スレッドはまだ起動しない。
 
@@ -77,14 +78,15 @@ class HandDetectionPipeline:
             calib_manager: ホモグラフィ変換に使用するキャリブレーションマネージャー
             calibrations: {camera_id: CalibrationConfig} の辞書
             table_id: 清掃セッションに紐づくテーブル識別子
-            debug_mode: True のとき QueueMonitorTask を追加起動し
-                        デバッグ画像を outputs/debug.jpg に保存する
+            debug_mode: True のとき デバッグ画像を outputs/debug.jpg に保存する
+            log_mode: True のとき QueueMonitorTask を起動してキューサイズをログ出力する
         """
         self._config = config
         self._calib_manager = calib_manager
         self._calibrations = calibrations
         self._table_id = table_id
         self._debug_mode = debug_mode
+        self._log_mode = log_mode
         self._stop_event = threading.Event()   # 全スレッドが監視する停止フラグ
         self._threads: list[threading.Thread] = []
         self._tracking_task: TrackingAndStorageTask | None = None
@@ -185,8 +187,8 @@ class HandDetectionPipeline:
             self._tracking_task,
         ]
 
-        # デバッグモード時のみ起動するスレッド
-        if self._debug_mode:
+        # debug または log モード時に起動するスレッド
+        if self._debug_mode or self._log_mode:
             self._threads.append(QueueMonitorTask(
                 queues=monitor_queues,
                 stop_event=self._stop_event,
