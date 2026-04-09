@@ -27,7 +27,7 @@ class HandDetectionConfig:
 
 @dataclass
 class PipelineConfig:
-    target_fps: float = 30.0
+    target_fps: float = 25.0
     frame_queue_maxsize: int = 300
     priority_camera_id: int = 0
     camera_ids: list[int] = field(default_factory=lambda: [0, 1])

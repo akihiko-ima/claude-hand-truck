@@ -11,7 +11,7 @@ min_presence_confidence = 0.5
 min_tracking_confidence = 0.5
 
 [pipeline]
-target_fps = 30.0
+target_fps = 25.0
 frame_queue_maxsize = 300
 priority_camera_id = 0
 camera_ids = [0, 1]
