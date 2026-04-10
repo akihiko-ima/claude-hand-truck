@@ -36,7 +36,7 @@ PREVIEW_HEIGHT = 200
 
 def _capture_frame(cam_id: int) -> tuple[cv2.VideoCapture, np.ndarray] | None:
     """カメラを起動して静止フレームを1枚取得する。"""
-    cap = cv2.VideoCapture(cam_id)
+    cap = cv2.VideoCapture(cam_id, cv2.CAP_DSHOW)
     if not cap.isOpened():
         console.print(f"[bold red]エラー: カメラ {cam_id} を開けませんでした。[/]")
         return None

@@ -39,7 +39,7 @@ def _run_calibration(config, calib_manager: CalibrationManager) -> dict | None:
     # 一時的にカメラをオープンしてキャリブレーション用フレームを取得
     caps = {}
     for cam_id in config.pipeline.camera_ids:
-        cap = cv2.VideoCapture(cam_id)
+        cap = cv2.VideoCapture(cam_id, cv2.CAP_DSHOW)
         if cap.isOpened():
             caps[cam_id] = cap
 

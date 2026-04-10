@@ -40,7 +40,7 @@ class CameraManager:
         Returns:
             接続成功の場合 True
         """
-        cap = cv2.VideoCapture(camera_id)
+        cap = cv2.VideoCapture(camera_id, cv2.CAP_DSHOW)
         if cap.isOpened():
             self._captures[camera_id] = cap
             logger.info(f"カメラ{camera_id}に接続しました。")

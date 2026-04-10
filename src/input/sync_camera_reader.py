@@ -44,7 +44,7 @@ class SyncCameraReadTask(threading.Thread):
 
         try:
             for cam_id in self._camera_ids:
-                cap = cv2.VideoCapture(cam_id)
+                cap = cv2.VideoCapture(cam_id, cv2.CAP_DSHOW)
                 if not cap.isOpened():
                     logger.error(f"カメラ ID:{cam_id} を開けませんでした")
                     return

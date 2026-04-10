@@ -40,7 +40,7 @@ def _detect_cameras() -> dict[int, cv2.VideoCapture]:
     """接続中のカメラを検出して返す。"""
     captures: dict[int, cv2.VideoCapture] = {}
     for cam_id in CAMERA_IDS:
-        cap = cv2.VideoCapture(cam_id)
+        cap = cv2.VideoCapture(cam_id, cv2.CAP_DSHOW)
         if cap.isOpened():
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAPTURE_WIDTH)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAPTURE_HEIGHT)
