@@ -23,3 +23,7 @@ output_path = "logs/hand_landmarks.csv"
 [zmq]
 enabled = true
 endpoint = "tcp://*:5555"
+
+[zmq_receiver]
+enabled = true
+endpoint = "tcp://*:5556"

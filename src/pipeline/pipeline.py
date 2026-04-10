@@ -90,15 +90,57 @@ class HandDetectionPipeline:
         self._stop_event = threading.Event()   # 全スレッドが監視する停止フラグ
         self._threads: list[threading.Thread] = []
         self._tracking_task: TrackingAndStorageTask | None = None
+        self._detection_enabled: threading.Event | None = None  # MP 有効フラグ
+        self._drain_queues: list[queue.Queue] = []  # drain 対象キューの参照
 
-    def start(self) -> None:
+    def enable_detection(self) -> None:
+        """手検出を有効化する（MP_START）。"""
+        if self._detection_enabled is not None:
+            self._detection_enabled.set()
+
+    def disable_detection(self) -> None:
+        """手検出を無効化する（MP_STOP）。"""
+        if self._detection_enabled is not None:
+            self._detection_enabled.clear()
+
+    def drain_queues(self) -> None:
+        """result_queue / csv_queue / zmq_queue の残存アイテムを全て破棄する。
+
+        MP_STOP から一定時間後に呼び出すことで、MP停止前の検出結果が
+        下流タスクへ流れ込まないようにする。
+        """
+        for q in self._drain_queues:
+            drained = 0
+            while not q.empty():
+                try:
+                    q.get_nowait()
+                    drained += 1
+                except queue.Empty:
+                    break
+            if drained:
+                logger.debug(f"drain_queues: {drained} アイテムを破棄しました ({q})")
+
+    def start(self, detection_enabled: bool = True) -> None:
         """キュー・コンポーネントを初期化し、全スレッドを起動する。
+
+        Args:
+            detection_enabled: False のとき手検出を無効状態で起動する。
+                               後から enable_detection() で有効化できる。
 
         start() は一度だけ呼び出すこと。
         二度呼び出した場合の動作は未定義。
         """
         pl = self._config.pipeline
         grid_cfg = self._config.grid
+
+        # ---- detection_enabled Event の生成 --------------------------------
+        # detection_enabled=False で起動する場合は Event を生成してクリア状態にする。
+        # detection_enabled=True（デフォルト）の場合は None を渡して常時有効とする。
+        if not detection_enabled:
+            self._detection_enabled = threading.Event()
+            # セットしない（クリア状態 = MP無効）
+        else:
+            self._detection_enabled = None  # 常時有効
 
         # ---- キューの生成 ------------------------------------------------
         # frame_queue: カメラフレームのバッファ。maxsize で上限を設けて
@@ -120,6 +162,13 @@ class HandDetectionPipeline:
         zmq_queue: queue.Queue | None = (
             queue.Queue(maxsize=0) if self._config.zmq.enabled else None
         )
+
+        # drain 対象キューの登録（MP_STOP 後のフラッシュ用）
+        self._drain_queues = [result_queue]
+        if csv_queue is not None:
+            self._drain_queues.append(csv_queue)
+        if zmq_queue is not None:
+            self._drain_queues.append(zmq_queue)
 
         # ---- ビジネスロジックコンポーネントの初期化 -------------------------
         storage = DataStorage()
@@ -183,6 +232,7 @@ class HandDetectionPipeline:
                 debug_mode=self._debug_mode,
                 csv_queue=csv_queue,        # None の場合はファンアウトしない
                 zmq_queue=zmq_queue,        # None の場合はファンアウトしない
+                detection_enabled=self._detection_enabled,
             ),
             self._tracking_task,
         ]

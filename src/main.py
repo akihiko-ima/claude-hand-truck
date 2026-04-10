@@ -17,6 +17,8 @@ from rich.panel import Panel
 from rich.text import Text
 
 from src.app_config import load_config
+from src.control.state import CameraStateManager
+from src.control.zmq_receiver import ZmqReceiver
 from src.detection.calibration_manager import CalibrationManager
 from src.pipeline.pipeline import HandDetectionPipeline
 
@@ -99,7 +101,7 @@ def main() -> None:
     if calibrations is None:
         return
 
-    pipeline = HandDetectionPipeline(
+    state_manager = CameraStateManager(
         config=config,
         calib_manager=calib_manager,
         calibrations=calibrations,
@@ -108,12 +110,49 @@ def main() -> None:
         log_mode=log_mode,
     )
 
-    try:
-        pipeline.start()
-        pipeline.wait()
-    except Exception as e:
-        logger.error(f"パイプライン実行中に例外が発生しました: {e}")
-        pipeline.stop()
+    import threading as _threading
+
+    if config.zmq_receiver.enabled:
+        # ZMQ 制御モード: 外部コマンドでパイプラインを制御する
+        console.print(
+            f"[cyan]ZMQ 制御モード: {config.zmq_receiver.endpoint} でコマンド待機中...[/]"
+        )
+        console.print("[dim]INIT → CAM_START → MP_START の順にコマンドを送信してください[/]")
+        stop_event = _threading.Event()
+        receiver = ZmqReceiver(
+            state_manager=state_manager,
+            endpoint=config.zmq_receiver.endpoint,
+            stop_event=stop_event,
+        )
+        receiver.start()
+        try:
+            while True:
+                import time as _time
+                _time.sleep(0.1)
+                if not receiver.is_alive():
+                    break
+        except KeyboardInterrupt:
+            pass
+        finally:
+            stop_event.set()
+            receiver.join(timeout=3.0)
+            state_manager.handle_command("FINALIZE")
+    else:
+        # 自動起動モード: 従来どおりパイプラインを直接起動する
+        pipeline = HandDetectionPipeline(
+            config=config,
+            calib_manager=calib_manager,
+            calibrations=calibrations,
+            table_id=TABLE_ID,
+            debug_mode=debug_mode,
+            log_mode=log_mode,
+        )
+        try:
+            pipeline.start()
+            pipeline.wait()
+        except Exception as e:
+            logger.error(f"パイプライン実行中に例外が発生しました: {e}")
+            pipeline.stop()
 
     console.print("[dim]CleanTrack を終了しました。[/]")
 

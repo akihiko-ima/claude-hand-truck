@@ -61,6 +61,7 @@ class PriorityHandDetectTask(threading.Thread):
         debug_mode: bool = False,
         csv_queue: queue.Queue | None = None,
         zmq_queue: queue.Queue | None = None,
+        detection_enabled: threading.Event | None = None,
     ) -> None:
         super().__init__(name="PriorityHandDetectTask", daemon=True)
 
@@ -86,6 +87,8 @@ class PriorityHandDetectTask(threading.Thread):
         self._debug_mode = debug_mode
         self._csv_queue = csv_queue
         self._zmq_queue = zmq_queue
+        # None のとき常に検出有効。Event がセットされているときのみ検出を実行する。
+        self._detection_enabled = detection_enabled
 
     def _create_detector(self) -> mp_vision.HandLandmarker:
         """IMAGE モードの HandLandmarker インスタンスを生成する。"""
@@ -227,6 +230,11 @@ class PriorityHandDetectTask(threading.Thread):
 
                     pri_frame = item.frames.get(self._priority_camera_id)
                     sec_frame = item.frames.get(self._secondary_camera_id)
+
+                    # detection_enabled が未セットの場合はフレームを消費するだけ
+                    # （検出・記録・ZMQ送信なし）
+                    if self._detection_enabled is not None and not self._detection_enabled.is_set():
+                        continue
 
                     # 両カメラを並列推論
                     future_pri = executor.submit(

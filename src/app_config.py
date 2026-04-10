@@ -46,12 +46,19 @@ class ZmqConfig:
 
 
 @dataclass
+class ZmqReceiverConfig:
+    enabled: bool = False
+    endpoint: str = "tcp://*:5556"
+
+
+@dataclass
 class AppConfig:
     grid: GridConfig = field(default_factory=GridConfig)
     hand_detection: HandDetectionConfig = field(default_factory=HandDetectionConfig)
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
     csv: CsvConfig = field(default_factory=CsvConfig)
     zmq: ZmqConfig = field(default_factory=ZmqConfig)
+    zmq_receiver: ZmqReceiverConfig = field(default_factory=ZmqReceiverConfig)
 
 
 def load_config(path: Path = Path("config/config.toml")) -> AppConfig:
@@ -102,5 +109,9 @@ def load_config(path: Path = Path("config/config.toml")) -> AppConfig:
         zmq=ZmqConfig(
             enabled=bool(zmq_data.get("enabled", True)),
             endpoint=str(zmq_data.get("endpoint", "tcp://*:5555")),
+        ),
+        zmq_receiver=ZmqReceiverConfig(
+            enabled=bool(data.get("zmq_receiver", {}).get("enabled", False)),
+            endpoint=str(data.get("zmq_receiver", {}).get("endpoint", "tcp://*:5556")),
         ),
     )
